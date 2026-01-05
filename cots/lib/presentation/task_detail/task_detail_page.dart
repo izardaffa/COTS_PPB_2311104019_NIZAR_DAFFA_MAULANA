@@ -4,6 +4,7 @@ import '../../design_system/app_colors.dart';
 import '../../design_system/typography.dart';
 import '../../design_system/spacing.dart';
 import '../../data/models/task_model.dart';
+import '../../data/services/task_service.dart';
 import '../../widgets/primary_button.dart';
 
 class TaskDetailPage extends StatefulWidget {
@@ -16,9 +17,11 @@ class TaskDetailPage extends StatefulWidget {
 }
 
 class _TaskDetailPageState extends State<TaskDetailPage> {
+  final _service = TaskService();
   late Task _task;
   late TextEditingController _catatanController;
   bool _isEditing = false;
+  bool _isSaving = false;
 
   @override
   void initState() {
@@ -59,27 +62,55 @@ class _TaskDetailPageState extends State<TaskDetailPage> {
   }
 
   void _toggleTaskStatus() {
-    setState(() {
-      if (_task.status == TaskStatus.selesai) {
-        _task = _task.copyWith(status: TaskStatus.berjalan);
-      } else {
-        _task = _task.copyWith(status: TaskStatus.selesai);
-      }
-    });
+    _updateStatus(_task.status != TaskStatus.selesai);
   }
 
-  void _saveCatatan() {
-    setState(() {
-      _task = _task.copyWith(catatan: _catatanController.text);
-      _isEditing = false;
-    });
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: const Text('Catatan berhasil disimpan'),
-        backgroundColor: AppColors.success,
-        duration: const Duration(seconds: 2),
-      ),
-    );
+  Future<void> _updateStatus(bool isDone) async {
+    setState(() => _isSaving = true);
+    try {
+      await _service.toggleTaskStatus(id: _task.id, isDone: isDone);
+      setState(() {
+        _task = _task.copyWith(
+          status: isDone ? TaskStatus.selesai : TaskStatus.berjalan,
+        );
+      });
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Gagal mengubah status'),
+          backgroundColor: AppColors.danger,
+        ),
+      );
+    } finally {
+      if (mounted) setState(() => _isSaving = false);
+    }
+  }
+
+  Future<void> _saveCatatan() async {
+    setState(() => _isSaving = true);
+    try {
+      await _service.updateNote(id: _task.id, note: _catatanController.text);
+      setState(() {
+        _task = _task.copyWith(catatan: _catatanController.text);
+        _isEditing = false;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Catatan berhasil disimpan'),
+          backgroundColor: AppColors.success,
+          duration: Duration(seconds: 2),
+        ),
+      );
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Gagal menyimpan catatan'),
+          backgroundColor: AppColors.danger,
+        ),
+      );
+    } finally {
+      if (mounted) setState(() => _isSaving = false);
+    }
   }
 
   @override
@@ -102,6 +133,7 @@ class _TaskDetailPageState extends State<TaskDetailPage> {
             onTap: () => Navigator.pop(context, _task),
             child: const Icon(Icons.arrow_back, color: AppColors.textPrimary),
           ),
+          centerTitle: true,
           title: Text(
             'Detail Tugas',
             style: AppTypography.heading2.copyWith(
@@ -109,8 +141,8 @@ class _TaskDetailPageState extends State<TaskDetailPage> {
             ),
           ),
           actions: [
-            GestureDetector(
-              onTap: () {
+            TextButton(
+              onPressed: () {
                 setState(() {
                   _isEditing = !_isEditing;
                   if (!_isEditing) {
@@ -118,18 +150,34 @@ class _TaskDetailPageState extends State<TaskDetailPage> {
                   }
                 });
               },
-              child: Container(
-                margin: const EdgeInsets.only(right: AppSpacing.md),
-                child: Center(
-                  child: Text(
-                    _isEditing ? 'Simpan' : 'Edit',
-                    style: AppTypography.bodyMedium.copyWith(
-                      color: AppColors.primary,
-                    ),
-                  ),
+              child: Text(
+                _isEditing ? 'Simpan' : 'Edit',
+                style: AppTypography.bodyMedium.copyWith(
+                  color: AppColors.primary,
                 ),
               ),
             ),
+            // GestureDetector(
+            //   onTap: () {
+            //     setState(() {
+            //       _isEditing = !_isEditing;
+            //       if (!_isEditing) {
+            //         _saveCatatan();
+            //       }
+            //     });
+            //   },
+            //   child: Container(
+            //     margin: const EdgeInsets.only(right: AppSpacing.md),
+            //     child: Center(
+            //       child: Text(
+            //         _isEditing ? 'Simpan' : 'Edit',
+            //         style: AppTypography.bodyMedium.copyWith(
+            //           color: AppColors.primary,
+            //         ),
+            //       ),
+            //     ),
+            //   ),
+            // ),
           ],
         ),
         body: SingleChildScrollView(
@@ -309,9 +357,9 @@ class _TaskDetailPageState extends State<TaskDetailPage> {
 
               // Delete Button
               PrimaryButton(
-                label: 'Simpan Perubahan',
+                label: _isSaving ? 'Menyimpan...' : 'Simpan Perubahan',
                 onPressed: () {
-                  Navigator.pop(context, _task);
+                  _isSaving ? {} : Navigator.pop(context, _task);
                 },
               ),
             ],

@@ -3,6 +3,7 @@ import '../../design_system/app_colors.dart';
 import '../../design_system/typography.dart';
 import '../../design_system/spacing.dart';
 import '../../data/models/task_model.dart';
+import '../../data/services/task_service.dart';
 import '../../widgets/statistic_card.dart';
 import '../../widgets/primary_button.dart';
 import '../../widgets/task_card.dart';
@@ -18,70 +19,63 @@ class DashboardPage extends StatefulWidget {
 }
 
 class _DashboardPageState extends State<DashboardPage> {
+  final _service = TaskService();
   late List<Task> tasks;
+  bool _isLoading = false;
+  String? _error;
 
   @override
   void initState() {
     super.initState();
-    tasks = _generateInitialTasks();
+    tasks = [];
+    _loadTasks();
   }
 
-  List<Task> _generateInitialTasks() {
-    return [
-      Task(
-        id: '1',
-        judul: 'Perancangan MVC + Services',
-        mataKuliah: 'Pemrograman Lanjut',
-        deadline: DateTime(2026, 1, 18),
-        catatan: '',
-        status: TaskStatus.berjalan,
-      ),
-      Task(
-        id: '2',
-        judul: 'Integrasi API HoReCa Supply Chain',
-        mataKuliah: 'Integrasi Sistem',
-        deadline: DateTime(2026, 1, 20),
-        catatan: '',
-        status: TaskStatus.berjalan,
-      ),
-      Task(
-        id: '3',
-        judul: 'UI Mobile Slicing',
-        mataKuliah: 'UI Engineering',
-        deadline: DateTime(2026, 1, 17),
-        catatan: '',
-        status: TaskStatus.berjalan,
-      ),
-      Task(
-        id: '4',
-        judul: 'Dokumentasi Endpoint',
-        mataKuliah: 'Pemrograman Lanjut',
-        deadline: DateTime(2026, 1, 16),
-        catatan: '',
-        status: TaskStatus.berjalan,
-      ),
-      Task(
-        id: '5',
-        judul: 'Laporan Pengabdian',
-        mataKuliah: 'KKN Tematik',
-        deadline: DateTime(2026, 1, 12),
-        catatan: '',
-        status: TaskStatus.selesai,
-      ),
-    ];
+  Future<void> _loadTasks() async {
+    setState(() {
+      _isLoading = true;
+      _error = null;
+    });
+
+    try {
+      final result = await _service.getAllTasks();
+      setState(() {
+        tasks = result;
+      });
+    } catch (e) {
+      setState(() {
+        _error = 'Gagal memuat data';
+      });
+    } finally {
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
+    }
   }
 
   int _getTaskStats(TaskStatus status) {
     return tasks.where((t) => t.status == status).length;
   }
 
+  bool _isDeadlineTomorrow(DateTime deadline) {
+    final now = DateTime.now();
+    final tomorrow = DateTime(now.year, now.month, now.day + 1);
+    final dateOnly = DateTime(deadline.year, deadline.month, deadline.day);
+    return dateOnly == tomorrow;
+  }
+
   @override
   Widget build(BuildContext context) {
     final totalTasks = tasks.length;
     final selesaiTasks = _getTaskStats(TaskStatus.selesai);
-    final upcomingTasks = [...tasks]
+    final nearestTasks = [...tasks]
+      ..removeWhere(
+        (task) =>
+            task.status == TaskStatus.selesai ||
+            !_isDeadlineTomorrow(task.deadline),
+      )
       ..sort((a, b) => a.deadline.compareTo(b.deadline));
-    final nearestTasks = upcomingTasks.take(3).toList();
+    final upcomingTomorrow = nearestTasks.take(3).toList();
 
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -116,6 +110,8 @@ class _DashboardPageState extends State<DashboardPage> {
                       );
                       if (updatedTasks != null) {
                         setState(() => tasks = updatedTasks);
+                      } else {
+                        _loadTasks();
                       }
                     },
                     child: Text('Daftar Tugas'),
@@ -126,27 +122,35 @@ class _DashboardPageState extends State<DashboardPage> {
               const SizedBox(height: AppSpacing.lg),
 
               // Statistics
-              Row(
-                children: [
-                  Expanded(
-                    child: StatisticCard(
-                      label: 'Total Tugas',
-                      value: totalTasks.toString(),
-                      // icon: Icons.assignment,
+              if (_isLoading)
+                const Center(child: CircularProgressIndicator())
+              else if (_error != null)
+                Text(
+                  _error!,
+                  style: AppTypography.body.copyWith(color: AppColors.danger),
+                )
+              else
+                Row(
+                  children: [
+                    Expanded(
+                      child: StatisticCard(
+                        label: 'Total Tugas',
+                        value: totalTasks.toString(),
+                        // icon: Icons.assignment,
+                      ),
                     ),
-                  ),
-                  const SizedBox(width: AppSpacing.md),
-                  Expanded(
-                    child: StatisticCard(
-                      label: 'Selesai',
-                      value: selesaiTasks.toString(),
-                      // icon: Icons.check_circle,
-                      // backgroundColor: AppColors.success.withOpacity(0.1),
-                      // textColor: AppColors.success,
+                    const SizedBox(width: AppSpacing.md),
+                    Expanded(
+                      child: StatisticCard(
+                        label: 'Selesai',
+                        value: selesaiTasks.toString(),
+                        // icon: Icons.check_circle,
+                        // backgroundColor: AppColors.success.withOpacity(0.1),
+                        // textColor: AppColors.success,
+                      ),
                     ),
-                  ),
-                ],
-              ),
+                  ],
+                ),
 
               const SizedBox(height: AppSpacing.lg),
 
@@ -161,7 +165,16 @@ class _DashboardPageState extends State<DashboardPage> {
                     ),
                   ),
                   const SizedBox(height: AppSpacing.md),
-                  if (nearestTasks.isEmpty)
+                  if (_isLoading)
+                    const Center(child: CircularProgressIndicator())
+                  else if (_error != null)
+                    Text(
+                      _error!,
+                      style: AppTypography.body.copyWith(
+                        color: AppColors.danger,
+                      ),
+                    )
+                  else if (nearestTasks.isEmpty)
                     Text(
                       'Belum ada tugas terjadwal',
                       style: AppTypography.body.copyWith(
@@ -171,7 +184,7 @@ class _DashboardPageState extends State<DashboardPage> {
                   else
                     Column(
                       children: [
-                        for (final task in nearestTasks)
+                        for (final task in upcomingTomorrow)
                           Padding(
                             padding: const EdgeInsets.only(
                               bottom: AppSpacing.md,
@@ -218,9 +231,7 @@ class _DashboardPageState extends State<DashboardPage> {
                     ),
                   );
                   if (newTask != null) {
-                    setState(() {
-                      tasks.add(newTask);
-                    });
+                    _loadTasks();
                   }
                 },
               ),

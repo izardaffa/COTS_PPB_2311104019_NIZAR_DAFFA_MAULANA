@@ -8,7 +8,7 @@ enum TaskStatus {
 }
 
 class Task {
-  final String id;
+  final int id;
   final String judul;
   final String mataKuliah;
   final DateTime deadline;
@@ -29,7 +29,7 @@ class Task {
   }
 
   Task copyWith({
-    String? id,
+    int? id,
     String? judul,
     String? mataKuliah,
     DateTime? deadline,
@@ -44,5 +44,41 @@ class Task {
       catatan: catatan ?? this.catatan,
       status: status ?? this.status,
     );
+  }
+
+  factory Task.fromJson(Map<String, dynamic> json) {
+    final statusString = (json['status'] as String?)?.toUpperCase();
+    final isDone = json['is_done'] as bool? ?? false;
+    final status = switch (statusString) {
+      'SELESAI' => TaskStatus.selesai,
+      'TERLAMBAT' => TaskStatus.terlambat,
+      'BERJALAN' => TaskStatus.berjalan,
+      _ => isDone ? TaskStatus.selesai : TaskStatus.berjalan,
+    };
+
+    return Task(
+      id: json['id'] as int,
+      judul: json['title'] as String,
+      mataKuliah: json['course'] as String,
+      deadline: DateTime.parse(json['deadline'] as String),
+      catatan: json['note'] as String?,
+      status: status,
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'title': judul,
+      'course': mataKuliah,
+      'deadline': deadline.toIso8601String(),
+      'status': switch (status) {
+        TaskStatus.selesai => 'SELESAI',
+        TaskStatus.terlambat => 'TERLAMBAT',
+        TaskStatus.berjalan => 'BERJALAN',
+      },
+      'note': catatan,
+      'is_done': status == TaskStatus.selesai,
+    };
   }
 }

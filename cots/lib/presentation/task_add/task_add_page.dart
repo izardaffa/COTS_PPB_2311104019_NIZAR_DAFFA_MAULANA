@@ -4,6 +4,7 @@ import '../../design_system/app_colors.dart';
 import '../../design_system/typography.dart';
 import '../../design_system/spacing.dart';
 import '../../data/models/task_model.dart';
+import '../../data/services/task_service.dart';
 import '../../widgets/task_input.dart';
 import '../../widgets/primary_button.dart';
 
@@ -15,11 +16,13 @@ class TaskAddPage extends StatefulWidget {
 }
 
 class _TaskAddPageState extends State<TaskAddPage> {
+  final _service = TaskService();
   final _formKey = GlobalKey<FormState>();
   final _judulController = TextEditingController();
   final _mataKuliahController = TextEditingController();
   final _catatanController = TextEditingController();
   DateTime? _selectedDate;
+  bool _isSubmitting = false;
 
   @override
   void dispose() {
@@ -85,28 +88,7 @@ class _TaskAddPageState extends State<TaskAddPage> {
   }
 
   void _submitForm() {
-    if (_formKey.currentState!.validate() && _validateDeadline() == null) {
-      final newTask = Task(
-        id: DateTime.now().toString(),
-        judul: _judulController.text,
-        mataKuliah: _mataKuliahController.text,
-        deadline: _selectedDate!,
-        catatan: _catatanController.text.isNotEmpty
-            ? _catatanController.text
-            : null,
-        status: TaskStatus.berjalan,
-      );
-
-      Navigator.pop(context, newTask);
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('${newTask.judul} berhasil ditambahkan'),
-          backgroundColor: AppColors.success,
-          duration: const Duration(seconds: 2),
-        ),
-      );
-    } else {
+    if (!(_formKey.currentState!.validate() && _validateDeadline() == null)) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Mohon lengkapi semua field yang diperlukan'),
@@ -114,6 +96,44 @@ class _TaskAddPageState extends State<TaskAddPage> {
           duration: Duration(seconds: 2),
         ),
       );
+      return;
+    }
+
+    _createTask();
+  }
+
+  Future<void> _createTask() async {
+    setState(() => _isSubmitting = true);
+    try {
+      final newTask = await _service.addTask(
+        title: _judulController.text,
+        course: _mataKuliahController.text,
+        deadline: _selectedDate!,
+        note: _catatanController.text,
+      );
+
+      if (mounted) {
+        Navigator.pop(context, newTask);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('${newTask.judul} berhasil ditambahkan'),
+            backgroundColor: AppColors.success,
+            duration: const Duration(seconds: 2),
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Gagal menambah tugas'),
+            backgroundColor: AppColors.danger,
+            duration: Duration(seconds: 2),
+          ),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isSubmitting = false);
     }
   }
 

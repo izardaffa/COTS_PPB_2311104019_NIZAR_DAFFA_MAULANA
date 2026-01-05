@@ -3,6 +3,7 @@ import '../../design_system/app_colors.dart';
 import '../../design_system/typography.dart';
 import '../../design_system/spacing.dart';
 import '../../data/models/task_model.dart';
+import '../../data/services/task_service.dart';
 import '../../widgets/task_card.dart';
 import '../task_detail/task_detail_page.dart';
 import '../task_add/task_add_page.dart';
@@ -18,14 +19,40 @@ class TaskListPage extends StatefulWidget {
 }
 
 class _TaskListPageState extends State<TaskListPage> {
+  final _service = TaskService();
   late List<Task> _tasks;
   TaskStatus? _selectedFilter;
   String _searchQuery = '';
+  bool _isLoading = false;
+  String? _error;
 
   @override
   void initState() {
     super.initState();
     _tasks = List.from(widget.tasks);
+    _loadTasks();
+  }
+
+  Future<void> _loadTasks() async {
+    setState(() {
+      _isLoading = true;
+      _error = null;
+    });
+
+    try {
+      final result = await _service.getAllTasks();
+      setState(() {
+        _tasks = result;
+      });
+    } catch (e) {
+      setState(() {
+        _error = 'Gagal memuat data';
+      });
+    } finally {
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
+    }
   }
 
   List<Task> _getFilteredTasks() {
@@ -95,9 +122,7 @@ class _TaskListPageState extends State<TaskListPage> {
                   MaterialPageRoute(builder: (context) => const TaskAddPage()),
                 );
                 if (newTask != null) {
-                  setState(() {
-                    _tasks.add(newTask);
-                  });
+                  await _loadTasks();
                 }
               },
               child: Text('Tambah'),
@@ -108,6 +133,20 @@ class _TaskListPageState extends State<TaskListPage> {
           padding: const EdgeInsets.all(AppSpacing.md),
           child: Column(
             children: [
+              if (_isLoading)
+                const Padding(
+                  padding: EdgeInsets.symmetric(vertical: AppSpacing.lg),
+                  child: CircularProgressIndicator(),
+                )
+              else if (_error != null)
+                Padding(
+                  padding: const EdgeInsets.symmetric(vertical: AppSpacing.lg),
+                  child: Text(
+                    _error!,
+                    style: AppTypography.body.copyWith(color: AppColors.danger),
+                  ),
+                ),
+
               // Search Bar
               TextField(
                 onChanged: (value) {
@@ -201,14 +240,7 @@ class _TaskListPageState extends State<TaskListPage> {
                           ),
                         );
                         if (updatedTask != null) {
-                          setState(() {
-                            final index = _tasks.indexWhere(
-                              (t) => t.id == task.id,
-                            );
-                            if (index != -1) {
-                              _tasks[index] = updatedTask;
-                            }
-                          });
+                          await _loadTasks();
                         }
                       },
                     );
