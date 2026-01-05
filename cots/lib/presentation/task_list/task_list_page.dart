@@ -80,6 +80,7 @@ class _TaskListPageState extends State<TaskListPage> {
             },
             child: const Icon(Icons.arrow_back, color: AppColors.textPrimary),
           ),
+          centerTitle: true,
           title: Text(
             'Daftar Tugas',
             style: AppTypography.heading2.copyWith(
@@ -87,35 +88,19 @@ class _TaskListPageState extends State<TaskListPage> {
             ),
           ),
           actions: [
-            Container(
-              margin: const EdgeInsets.only(right: AppSpacing.md),
-              decoration: BoxDecoration(
-                color: AppColors.primary,
-                shape: BoxShape.circle,
-              ),
-              child: Material(
-                color: Colors.transparent,
-                child: InkWell(
-                  onTap: () async {
-                    final newTask = await Navigator.push<Task>(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => const TaskAddPage(),
-                      ),
-                    );
-                    if (newTask != null) {
-                      setState(() {
-                        _tasks.add(newTask);
-                      });
-                    }
-                  },
-                  customBorder: const CircleBorder(),
-                  child: const Padding(
-                    padding: EdgeInsets.all(AppSpacing.sm),
-                    child: Icon(Icons.add, color: Colors.white, size: 20),
-                  ),
-                ),
-              ),
+            TextButton(
+              onPressed: () async {
+                final newTask = await Navigator.push<Task>(
+                  context,
+                  MaterialPageRoute(builder: (context) => const TaskAddPage()),
+                );
+                if (newTask != null) {
+                  setState(() {
+                    _tasks.add(newTask);
+                  });
+                }
+              },
+              child: Text('Tambah'),
             ),
           ],
         ),
